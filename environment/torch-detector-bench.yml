@@ -1,0 +1,24 @@
+name: torch-detector-bench
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  - numpy
+  - pandas
+  - matplotlib
+  - pyyaml
+  - pillow
+  - scipy
+  - tqdm
+  - jupyter
+  - pytorch
+  - torchvision
+  - pytorch-cuda=12.1
+  - pip:
+      - ultralytics
+      - transformers
+      - timm
+      - pycocotools

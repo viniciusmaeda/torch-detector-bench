@@ -1,0 +1,49 @@
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments and local tooling
+.venv/
+venv/
+env/
+.env
+.env.*
+.python-version
+
+# IDE and editor settings
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Experiment outputs
+results/
+logs/
+*.log
+*.csv
+
+# Datasets and generated labels
+datasets/
+
+# Model weights and checkpoints
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.safetensors
+
+# Local databases and temp files
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+*.tmp
+*.temp
+
+# Local Codex metadata
+.codex

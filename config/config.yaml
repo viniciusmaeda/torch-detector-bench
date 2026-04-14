@@ -1,0 +1,122 @@
+experiment:
+  seed: 42
+  output_dir: results
+
+
+training:
+  # Shared defaults applied to every model unless overridden below.
+  epochs: 100
+  log_interval: 10
+  save_best_only: true
+
+  # Shared dataloader / image defaults.
+  batch_size: 4
+  num_workers: 4
+  image_size: 640
+
+models:
+  yolo:
+    # Supported YOLO models:
+    # yolov8n.pt, yolov8s.pt, yolov8m.pt, yolov8l.pt, yolov8x.pt
+    # yolo11n.pt, yolo11s.pt, yolo11m.pt, yolo11l.pt, yolo11x.pt
+    # yolo26n.pt, yolo26s.pt, yolo26m.pt, yolo26l.pt, yolo26x.pt
+    model_name: yolo26m.pt
+    training:
+      optimizer: AdamW # Supported optimizers: SGD, Adam, AdamW, RMSProp
+      learning_rate: 0.001
+      weight_decay: 0.001
+      momentum: 0.937
+      batch_size: 4
+      num_workers: 4
+      image_size: 640
+
+  rtdetr:
+    # Supported RT-DETR models:
+    # rtdetr-l.pt, rtdetr-x.pt
+    model_name: rtdetr-l.pt
+    training:
+      optimizer: AdamW # Supported optimizers: SGD, Adam, AdamW, RMSProp
+      learning_rate: 0.001
+      weight_decay: 0.001
+      momentum: 0.9
+      batch_size: 4
+      num_workers: 4
+      image_size: 640
+
+  fasterrcnn:
+    training:
+      optimizer: AdamW # Supported optimizers: SGD, Adam, AdamW, RMSProp
+      learning_rate: 0.00005
+      weight_decay: 0.0001
+      momentum: 0.9
+      batch_size: 2
+      num_workers: 2
+      image_size: 640
+      
+  detr:
+    training:
+      optimizer: AdamW # Supported optimizers: SGD, Adam, AdamW, RMSProp
+      learning_rate: 0.00005
+      backbone_learning_rate: 0.000005
+      weight_decay: 0.0001
+      grad_clip_norm: 0.1
+      scheduler: MultiStepLR
+      scheduler_milestones: [30, 60]
+      scheduler_gamma: 0.1
+      freeze_backbone: true
+      momentum: 0.9
+      batch_size: 1
+      num_workers: 2
+      image_size: 640
+      qualitative_images: 4
+
+
+evaluation:
+  iou_threshold: 0.5
+  score_threshold: 0.25
+  max_detections: 100
+  
+  
+dataset:
+  root: datasets
+  train_images: images/train
+  val_images: images/valid
+  test_images: images/test
+  train_annotations: images/train/_annotations.coco.json
+  val_annotations: images/valid/_annotations.coco.json
+  test_annotations: images/test/_annotations.coco.json
+  num_classes: 33
+  class_names:
+  - __background__
+  - objects
+  - Truta-arco-iris
+  - arqueiro
+  - arraia
+  - axolote
+  - baiacu-verde
+  - bananinha
+  - cachara
+  - canivete
+  - cascudo
+  - cascudo_chinelo
+  - curimbata
+  - diamante
+  - dourado
+  - jacare
+  - jau
+  - mono
+  - noivinha
+  - pacu
+  - pacu_prata
+  - palmitinho
+  - piapara
+  - pintado
+  - piramboia
+  - piranha
+  - piraputanga
+  - pirarucu
+  - saia-branca
+  - sardinha
+  - saua
+  - tetra-cego
+  - zebrinha

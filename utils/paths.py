@@ -36,6 +36,15 @@ def format_rtdetr_results_dir(model_name: str) -> str:
     return stem
 
 
+def format_fasterrcnn_results_dir(model_name: str) -> str:
+    """Format a Faster R-CNN variant into the expected top-level results directory name."""
+    stem = Path(model_name).stem
+    if stem.lower().startswith("fasterrcnn_"):
+        suffix = stem[len("fasterrcnn_"):].replace("_", "-")
+        return f"FasterRCNN-{suffix}"
+    return MODEL_RESULTS_DIRS["fasterrcnn"]
+
+
 def get_model_results_dir(project_root: Path, config: Dict[str, Any], model_name: str) -> Path:
     """Return the model-specific directory inside results/."""
     model_key = get_model_key(model_name)
@@ -46,6 +55,11 @@ def get_model_results_dir(project_root: Path, config: Dict[str, Any], model_name
     if model_key == "rtdetr":
         rtdetr_model_name = str(config.get("models", {}).get("rtdetr", {}).get("model_name", "rtdetr"))
         return results_root / format_rtdetr_results_dir(rtdetr_model_name)
+    if model_key == "fasterrcnn":
+        fasterrcnn_model_name = str(
+            config.get("models", {}).get("fasterrcnn", {}).get("model_name", "fasterrcnn")
+        )
+        return results_root / format_fasterrcnn_results_dir(fasterrcnn_model_name)
     return results_root / MODEL_RESULTS_DIRS[model_key]
 
 

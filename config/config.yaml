@@ -44,6 +44,11 @@ models:
       image_size: 640
 
   fasterrcnn:
+    # Supported Faster R-CNN models:
+    # fasterrcnn_resnet50_fpn
+    # fasterrcnn_resnet50_fpn_v2
+    # fasterrcnn_mobilenet_v3_large_fpn
+    model_name: fasterrcnn_resnet50_fpn_v2
     training:
       optimizer: AdamW # Supported optimizers: SGD, Adam, AdamW, RMSProp
       learning_rate: 0.00005

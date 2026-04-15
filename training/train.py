@@ -63,11 +63,11 @@ def _run_torch_epoch(
     for batch_index, (images, targets) in progress_bar:
         optimizer.zero_grad()
 
-        if model.name == "Faster R-CNN":
+        if model.config_key == "fasterrcnn":
             processed_images, processed_targets = model.prepare_batch(images, targets, device)
             loss_output = model.model(processed_images, processed_targets)
             loss = sum(loss_value for loss_value in loss_output.values())
-        elif model.name == "DETR":
+        elif model.config_key == "detr":
             pixel_values, pixel_mask, labels = model.prepare_batch(images, targets, device)
             loss_output = model.model(pixel_values=pixel_values, pixel_mask=pixel_mask, labels=labels)
             loss = loss_output.loss
@@ -155,7 +155,7 @@ def _validate_torch_epoch(
     log_interval: int = 10,
 ) -> float:
     """Compute validation loss."""
-    if model.name == "Faster R-CNN":
+    if model.config_key == "fasterrcnn":
         # Torchvision detection models return losses only in train mode.
         model.model.train()
     else:
@@ -171,11 +171,11 @@ def _validate_torch_epoch(
             leave=False,
         )
         for batch_index, (images, targets) in progress_bar:
-            if model.name == "Faster R-CNN":
+            if model.config_key == "fasterrcnn":
                 processed_images, processed_targets = model.prepare_batch(images, targets, device)
                 loss_output = model.model(processed_images, processed_targets)
                 loss = sum(loss_value for loss_value in loss_output.values())
-            elif model.name == "DETR":
+            elif model.config_key == "detr":
                 pixel_values, pixel_mask, labels = model.prepare_batch(images, targets, device)
                 loss_output = model.model(pixel_values=pixel_values, pixel_mask=pixel_mask, labels=labels)
                 loss = loss_output.loss

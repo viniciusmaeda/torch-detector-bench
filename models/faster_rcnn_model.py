@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, Final, List, Optional
 
 import torch
 from PIL import Image
-from torchvision.models.detection import fasterrcnn_resnet50_fpn
+from torchvision.models.detection import (
+    fasterrcnn_mobilenet_v3_large_fpn,
+    fasterrcnn_resnet50_fpn,
+    fasterrcnn_resnet50_fpn_v2,
+)
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor
 from torchvision.transforms import functional as F
 
@@ -21,11 +25,22 @@ from utils.optimizer_factory import (
 )
 from utils.paths import get_model_checkpoints_dir
 
+SUPPORTED_FASTERRCNN_MODELS: Final[tuple[str, ...]] = (
+    "fasterrcnn_resnet50_fpn",
+    "fasterrcnn_resnet50_fpn_v2",
+    "fasterrcnn_mobilenet_v3_large_fpn",
+)
+DEFAULT_FASTERRCNN_MODEL: Final[str] = "fasterrcnn_resnet50_fpn"
+FASTER_R_CNN_MODEL_FACTORIES: Final[dict[str, Callable[..., torch.nn.Module]]] = {
+    "fasterrcnn_resnet50_fpn": fasterrcnn_resnet50_fpn,
+    "fasterrcnn_resnet50_fpn_v2": fasterrcnn_resnet50_fpn_v2,
+    "fasterrcnn_mobilenet_v3_large_fpn": fasterrcnn_mobilenet_v3_large_fpn,
+}
+
 
 class FasterRCNNDetector:
     """Wrapper around torchvision Faster R-CNN."""
 
-    name = "Faster R-CNN"
     config_key = "fasterrcnn"
     architecture_type = "Two-stage detector"
     is_ultralytics = False
@@ -40,7 +55,9 @@ class FasterRCNNDetector:
         self.class_names = class_names
         self.device = device
         self.config = config
-        self.model = fasterrcnn_resnet50_fpn(weights="DEFAULT")
+        self.model_name = self._resolve_model_name(config)
+        self.name = f"Faster R-CNN ({self.model_name})"
+        self.model = FASTER_R_CNN_MODEL_FACTORIES[self.model_name](weights="DEFAULT")
         in_features = self.model.roi_heads.box_predictor.cls_score.in_features
         self.model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
         self.model.to(device)
@@ -54,6 +71,19 @@ class FasterRCNNDetector:
             / "weights"
             / "best.pt"
         )
+
+    @staticmethod
+    def _resolve_model_name(config: Dict[str, Any]) -> str:
+        """Read and validate the configured Faster R-CNN variant."""
+        model_name = str(
+            config.get("models", {}).get("fasterrcnn", {}).get("model_name", DEFAULT_FASTERRCNN_MODEL)
+        ).strip()
+        if model_name not in SUPPORTED_FASTERRCNN_MODELS:
+            supported = ", ".join(SUPPORTED_FASTERRCNN_MODELS)
+            raise ValueError(
+                f"Unsupported Faster R-CNN model '{model_name}'. Supported values: {supported}"
+            )
+        return model_name
 
     def build_optimizer(self) -> torch.optim.Optimizer:
         """Create the optimizer from the shared experiment config."""

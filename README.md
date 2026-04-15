@@ -34,6 +34,8 @@ The current configuration file selects these concrete variants:
 - `fasterrcnn`: `fasterrcnn_resnet50_fpn`
 - `detr`: `facebook/detr-resnet-50`
 
+The Faster R-CNN variant can be changed in [config/config.yaml](config/config.yaml) through `models.fasterrcnn.model_name`.
+
 ## Repository Structure
 
 ```text

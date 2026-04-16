@@ -240,7 +240,7 @@ def train_model(
     logger=None,
 ):
     """Train the selected detector and save the best checkpoint."""
-    if model.is_ultralytics:
+    if getattr(model, "uses_external_training_loop", False):
         return model.fit(
             train_dataloader=dataloader,
             val_dataloader=val_dataloader,

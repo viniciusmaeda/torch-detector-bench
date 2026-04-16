@@ -25,6 +25,7 @@ def get_model_key(model_name: str) -> str:
         "rtdetr": "rtdetr",
         "fasterrcnn": "fasterrcnn",
         "detr": "detr",
+        "cascadercnn": "cascadercnn",
     }
     if normalized not in aliases:
         raise ValueError(f"Unsupported model name '{model_name}'")

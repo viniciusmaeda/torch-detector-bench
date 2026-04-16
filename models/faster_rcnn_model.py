@@ -44,6 +44,7 @@ class FasterRCNNDetector:
     config_key = "fasterrcnn"
     architecture_type = "Two-stage detector"
     is_ultralytics = False
+    uses_external_training_loop = False
 
     def __init__(
         self,

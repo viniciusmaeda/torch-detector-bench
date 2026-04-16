@@ -10,6 +10,7 @@ from utils.config import get_model_key
 MODEL_RESULTS_DIRS = {
     "detr": "Detr",
     "fasterrcnn": "FasterRCNN",
+    "cascadercnn": "CascadeRCNN",
 }
 CHECKPOINTS_DIRNAME = "checkpoints"
 
@@ -45,6 +46,15 @@ def format_fasterrcnn_results_dir(model_name: str) -> str:
     return MODEL_RESULTS_DIRS["fasterrcnn"]
 
 
+def format_cascadercnn_results_dir(model_name: str) -> str:
+    """Format a Cascade R-CNN variant into the expected top-level results directory name."""
+    stem = Path(model_name).stem
+    if stem.lower().startswith("cascade_rcnn_"):
+        suffix = stem[len("cascade_rcnn_"):].replace("_", "-")
+        return f"CascadeRCNN-{suffix}"
+    return MODEL_RESULTS_DIRS["cascadercnn"]
+
+
 def get_model_results_dir(project_root: Path, config: Dict[str, Any], model_name: str) -> Path:
     """Return the model-specific directory inside results/."""
     model_key = get_model_key(model_name)
@@ -60,6 +70,11 @@ def get_model_results_dir(project_root: Path, config: Dict[str, Any], model_name
             config.get("models", {}).get("fasterrcnn", {}).get("model_name", "fasterrcnn")
         )
         return results_root / format_fasterrcnn_results_dir(fasterrcnn_model_name)
+    if model_key == "cascadercnn":
+        cascadercnn_model_name = str(
+            config.get("models", {}).get("cascadercnn", {}).get("model_name", "cascadercnn")
+        )
+        return results_root / format_cascadercnn_results_dir(cascadercnn_model_name)
     return results_root / MODEL_RESULTS_DIRS[model_key]
 
 

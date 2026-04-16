@@ -41,6 +41,7 @@ class YOLODetector:
     config_key = "yolo"
     architecture_type = "One-stage detector"
     is_ultralytics = True
+    uses_external_training_loop = True
 
     def __init__(self, config: Dict[str, Any], class_names: List[str], device: torch.device) -> None:
         self.config = config

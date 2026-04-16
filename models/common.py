@@ -25,6 +25,7 @@ class DetectorProtocol(Protocol):
     config_key: str
     architecture_type: str
     is_ultralytics: bool
+    uses_external_training_loop: bool
 
     def build_optimizer(self) -> Optional[torch.optim.Optimizer]:
         ...

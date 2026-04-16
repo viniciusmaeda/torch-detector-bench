@@ -12,10 +12,6 @@ import yaml
 
 from datasets.dataset_loader import build_dataloaders
 from evaluation.evaluate import evaluate_model
-from models.detr_model import DETRDetector
-from models.faster_rcnn_model import FasterRCNNDetector
-from models.rtdetr_model import RTDETRDetector
-from models.yolo_model import YOLODetector
 from training.train import train_model
 from utils.config import get_training_config
 from utils.logger import get_logger, log_config, set_seed
@@ -31,7 +27,7 @@ def parse_args() -> argparse.Namespace:
         "--model",
         type=str,
         required=True,
-        choices=["yolo", "rtdetr", "fasterrcnn", "detr"],
+        choices=["yolo", "rtdetr", "fasterrcnn", "detr", "cascadercnn", "cascade-rcnn"],
         help="Model architecture to train and evaluate.",
     )
     parser.add_argument(
@@ -55,10 +51,16 @@ def build_model(model_name: str, config: Dict[str, Any], device: torch.device):
     class_names = config["dataset"]["class_names"]
 
     if model_name == "yolo":
+        from models.yolo_model import YOLODetector
+
         return YOLODetector(config=config, class_names=class_names, device=device)
     if model_name == "rtdetr":
+        from models.rtdetr_model import RTDETRDetector
+
         return RTDETRDetector(config=config, class_names=class_names, device=device)
     if model_name == "fasterrcnn":
+        from models.faster_rcnn_model import FasterRCNNDetector
+
         return FasterRCNNDetector(
             num_classes=num_classes,
             class_names=class_names,
@@ -66,7 +68,18 @@ def build_model(model_name: str, config: Dict[str, Any], device: torch.device):
             config=config,
         )
     if model_name == "detr":
+        from models.detr_model import DETRDetector
+
         return DETRDetector(
+            num_classes=num_classes,
+            class_names=class_names,
+            device=device,
+            config=config,
+        )
+    if model_name in {"cascadercnn", "cascade-rcnn"}:
+        from models.cascade_rcnn_model import CascadeRCNNDetector
+
+        return CascadeRCNNDetector(
             num_classes=num_classes,
             class_names=class_names,
             device=device,

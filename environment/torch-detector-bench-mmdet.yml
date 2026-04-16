@@ -1,0 +1,28 @@
+name: torch-detector-bench-mmdet
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pip
+  # Keep NumPy on the 1.x line because PyTorch/MMCV wheels in this stack
+  # may be built against the NumPy 1.x C-API.
+  - numpy=1.26.*
+  - pandas
+  - matplotlib
+  - pyyaml
+  - pillow
+  - scipy
+  - tqdm
+  - jupyter
+  # MMCV wheels are more stable with the Torch 2.1 series than with newer stacks.
+  - pytorch=2.1.*
+  - torchvision=0.16.*
+  - pytorch-cuda=12.1
+  - pip:
+      - pycocotools
+      - openmim==0.3.9
+      # Keep OpenCV on a release line that still works with NumPy 1.26.x.
+      - opencv-python==4.10.0.84
+      - mmengine==0.10.7

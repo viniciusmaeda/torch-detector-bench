@@ -28,6 +28,7 @@ class RTDETRDetector:
     config_key = "rtdetr"
     architecture_type = "Transformer-based detector"
     is_ultralytics = True
+    uses_external_training_loop = True
 
     def __init__(self, config: Dict[str, Any], class_names: List[str], device: torch.device) -> None:
         self.config = config

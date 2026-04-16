@@ -27,6 +27,7 @@ class DETRDetector:
     config_key = "detr"
     architecture_type = "Transformer-based detector"
     is_ultralytics = False
+    uses_external_training_loop = False
 
     def __init__(
         self,

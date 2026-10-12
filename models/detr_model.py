@@ -40,7 +40,10 @@ class DETRDetector:
         self.config = config
         id2label = {index: label for index, label in enumerate(class_names[1:])}
         label2id = {label: index for index, label in id2label.items()}
-        self.image_processor = DetrImageProcessor.from_pretrained("facebook/detr-resnet-50")
+        image_size = int(get_training_value(config, self.config_key, "image_size"))
+        self.image_processor = DetrImageProcessor.from_pretrained(
+            "facebook/detr-resnet-50", size={"shortest_edge": image_size, "longest_edge": image_size}
+        )
         self.model = DetrForObjectDetection.from_pretrained(
             "facebook/detr-resnet-50",
             num_labels=num_classes - 1,
@@ -204,4 +207,4 @@ class DETRDetector:
 
     def num_parameters(self) -> int:
         """Count trainable parameters."""
-        return sum(parameter.numel() for parameter in self.model.parameters() if parameter.requires_grad)
+        return sum(parameter.numel() for parameter in self.model.parameters())

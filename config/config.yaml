@@ -1,18 +1,33 @@
 experiment:
   seed: 42
   output_dir: results
+  name: fish_cv5_seed42
+
+cross_validation:
+  enabled: true
+  n_splits: 5
+  strategy: iterative_multilabel
+  checkpoint: last
+  # Optional CSV with image_id,group_id for related images; never inferred from filenames.
+  group_file: null
+
+statistics:
+  primary_metric: mAP50_95
+  comparison_metrics: [mAP50_95, mAP50, F1, MAE, RMSE]
+  required_models: [yolo, rtdetr, fasterrcnn, detr]
+  alpha: 0.05
 
 
 training:
   # Shared defaults applied to every model unless overridden below.
   epochs: 100
   log_interval: 10
-  save_best_only: true
 
   # Shared dataloader / image defaults.
   batch_size: 4
   num_workers: 4
   image_size: 640
+  qualitative_images: 6
 
 models:
   yolo:
@@ -20,7 +35,7 @@ models:
     # yolov8n.pt, yolov8s.pt, yolov8m.pt, yolov8l.pt, yolov8x.pt
     # yolo11n.pt, yolo11s.pt, yolo11m.pt, yolo11l.pt, yolo11x.pt
     # yolo26n.pt, yolo26s.pt, yolo26m.pt, yolo26l.pt, yolo26x.pt
-    model_name: yolo26m.pt
+    model_name: yolov8m.pt
     training:
       optimizer: AdamW # Supported optimizers: SGD, Adam, AdamW, RMSProp
       learning_rate: 0.001
@@ -79,21 +94,19 @@ models:
 evaluation:
   iou_threshold: 0.5
   score_threshold: 0.25
+  # Retain low-score detections for COCO AP; fixed threshold above is for P/R/F1 and counts.
+  ap_score_threshold: 0.001
   max_detections: 100
+  warmup_batches: 2
   
   
 dataset:
   root: datasets
-  train_images: images/train
-  val_images: images/valid
-  test_images: images/test
-  train_annotations: images/train/_annotations.coco.json
-  val_annotations: images/valid/_annotations.coco.json
-  test_annotations: images/test/_annotations.coco.json
-  num_classes: 33
+  images: images/all
+  annotations: images/all/_annotations.coco.json
+  num_classes: 32
   class_names:
   - __background__
-  - objects
   - Truta-arco-iris
   - arqueiro
   - arraia

@@ -1,177 +1,218 @@
 # torch-detector-bench
 
-Benchmark project for training and evaluating multiple object detection architectures on a COCO-style dataset using PyTorch, Torchvision, Hugging Face Transformers, and Ultralytics.
+Treinamento e comparação de YOLO, RT-DETR, Faster R-CNN e DETR com **cross-validation
+de cinco dobras sobre todas as imagens** de um dataset de detecção COCO. O projeto
+exporta resultados reproduzíveis e artefatos para artigos científicos.
 
-The repository currently supports:
-
-- YOLO variants through Ultralytics
-- RT-DETR variants through Ultralytics
-- Faster R-CNN with Torchvision
-- DETR with Hugging Face Transformers
-
-## Project Goals
-
-This project provides a single pipeline to:
-
-- train different detector families with a shared dataset layout
-- evaluate them with a common set of detection and counting metrics
-- save logs, checkpoints, training curves, and qualitative predictions
-- compare results across one-stage, two-stage, and transformer-based detectors
-
-## Supported Models
-
-The CLI currently supports the following model keys:
-
-- `yolo`
-- `rtdetr`
-- `fasterrcnn`
-- `detr`
-
-The current configuration file selects these concrete variants:
-
-- `yolo`: `yolo26m.pt`
-- `rtdetr`: `rtdetr-l.pt`
-- `fasterrcnn`: `fasterrcnn_resnet50_fpn`
-- `detr`: `facebook/detr-resnet-50`
-
-The Faster R-CNN variant can be changed in [config/config.yaml](config/config.yaml) through `models.fasterrcnn.model_name`.
-
-## Repository Structure
+## Dataset e protocolo
 
 ```text
-compare_torch_detectors/
-├── config/
-│   └── config.yaml
-├── datasets/
-│   ├── images/
-│   └── labels/
-├── environment/
-│   └── torch-detector-bench.yml
-├── evaluation/
-├── models/
-├── training/
-├── utils/
-├── main.py
-└── results/
+datasets/images/all/
+├── imagem_001.jpg
+├── ...
+└── _annotations.coco.json
 ```
 
-## Requirements
+Configure `dataset.images` e `dataset.annotations` em [config/config.yaml](config/config.yaml).
+As classes e os IDs são inferidos automaticamente do JSON, com um mapeamento global
+fixo. Categorias sem nenhuma anotação, como `objects` neste dataset, são excluídas;
+`__background__` é acrescentado apenas à interface interna. Os arquivos originais
+não são alterados. As imagens são compartilhadas por links simbólicos e os rótulos
+YOLO são convertidos uma vez, com o mesmo mapeamento em todas as dobras.
 
-- Python 3.10
-- PyTorch
-- Torchvision
-- CUDA support if you want GPU training
-- Ultralytics
-- Transformers
-- pycocotools
+A divisão usa estratificação multirrótulo iterativa: classes raras são distribuídas
+primeiro, considerando presença por imagem. A implementação adapta a alocação de
+Sechidis et al. (2011), acrescentando limites de capacidade para equilibrar o número
+de imagens. Não é uma promessa de balanceamento exato de todas as classes/objetos.
+O manifesto registra a seed e a impressão SHA256 das imagens, anotações e protocolo.
 
-The Conda environment configuration file is available at [environment/torch-detector-bench.yml](environment/torch-detector-bench.yml).
+Para o dataset de 1.562 imagens, a seed 42 produz:
 
-## Environment Setup
+| Dobra | Treinamento | Avaliação |
+|---|---:|---:|
+| 1 | 1.250 | 312 |
+| 2 | 1.250 | 312 |
+| 3 | 1.250 | 312 |
+| 4 | 1.249 | 313 |
+| 5 | 1.249 | 313 |
 
-Create the environment with Conda using the name `torch-detector-bench`:
+As 31 classes anotadas aparecem nas cinco dobras. A classe `jau` aparece em 3, 2, 2,
+3 e 3 imagens, respectivamente. Cada imagem é avaliada exatamente uma vez e usada
+para treinamento nas outras quatro execuções. Não há teste fixo separado.
+
+Se houver frames do mesmo vídeo, variantes aumentadas ou outras imagens da mesma
+origem, forneça `cross_validation.group_file`, um CSV com `image_id,group_id` e uma
+linha por imagem. Os grupos ficam inteiros em uma dobra; as quantidades podem variar.
+Nomes repetidos não identificam automaticamente a mesma origem. O modo padrão assume
+imagens independentes. Baixe imagens sem augmentation offline e aplique augmentation
+somente ao treinamento de cada dobra.
+
+## Ambiente
 
 ```bash
 conda env create -n torch-detector-bench -f environment/torch-detector-bench.yml
 conda activate torch-detector-bench
 ```
 
-## Dataset Format
+O ambiente inclui PyTorch, Torchvision, Ultralytics, Transformers, pycocotools,
+NumPy, pandas, SciPy e Matplotlib. CUDA é opcional. Os pesos pré-treinados são
+carregados pelos respectivos frameworks; o primeiro treinamento pode baixá-los.
+`--prepare-only` não baixa pesos e não importa os detectores.
 
-The project expects a COCO-style dataset structure configured in [config/config.yaml](config/config.yaml):
+## Execução
 
-```text
-datasets/
-├── images/
-│   ├── train/
-│   ├── valid/
-│   └── test/
-└── labels/
-    ├── train/
-    ├── valid/
-    └── test/
-```
-
-The annotation files referenced by default are:
-
-- `datasets/images/train/_annotations.coco.json`
-- `datasets/images/valid/_annotations.coco.json`
-- `datasets/images/test/_annotations.coco.json`
-
-If your dataset classes change, synchronize them into the config file with:
+Validar os dados, gerar as dobras e os gráficos de distribuição:
 
 ```bash
-python datasets/sync_dataset_classes.py
+python main.py --prepare-only
 ```
 
-## Configuration
-
-Experiment settings are defined in [config/config.yaml](config/config.yaml), including:
-
-- random seed
-- output directory
-- shared training defaults
-- model-specific optimizer and training settings
-- evaluation thresholds
-- dataset paths and class names
-
-## Running Experiments
-
-Run training and evaluation from the project root:
+Treinar as cinco dobras de um modelo, ou todos os quatro sequencialmente:
 
 ```bash
 python main.py --model yolo
 python main.py --model rtdetr
 python main.py --model fasterrcnn
 python main.py --model detr
+python main.py --model all
 ```
 
-To use a different configuration file:
+Execuções específicas e regeneração de relatórios:
 
 ```bash
-python main.py --model fasterrcnn --config config/config.yaml
+python main.py --model detr --fold 1 2
+python main.py --model detr
+python main.py --reports-only
+python main.py --model yolo --config config/config.yaml
 ```
 
-## Outputs
+Cada comando de treinamento inicia uma execução completa desde os pesos de origem:
+as cinco dobras são treinadas novamente, mesmo se uma execução anterior foi interrompida
+ou concluída. Não é necessário um parâmetro de retomada. `--fold` limita a nova execução
+às dobras indicadas, para verificações específicas; não acumula dobras de execuções anteriores.
+Os resultados anteriores dos modelos escolhidos e os relatórios são arquivados em
+`archive/<data-hora>/`, preservando os registros para o artigo e evitando misturar históricos.
+Com `--model all`, os quatro modelos anteriores são arquivados antes de qualquer treinamento.
+Resultados de outros modelos só podem ser comparados se o código e o ambiente forem iguais.
+Para alterar o dataset ou o protocolo das dobras, use um novo `experiment.name`.
 
-Generated artifacts are stored under the directory defined by `experiment.output_dir` in the config file, which currently points to `results/`.
+Defina épocas, hiperparâmetros, limiares e métricas estatísticas **antes** da execução.
+Cada dobra cria modelo, otimizador e scheduler novos. O checkpoint avaliado é
+`last.pt`, da última época definida, sem early stopping pela dobra de avaliação.
+Ultralytics fornece os pesos EMA da última época. Seu `best.pt` e sua validação final
+nativa podem existir, mas não são usados no benchmark comum.
 
-Depending on the selected model, the project saves:
+Os tamanhos configurados são aplicados a todos os detectores. Faster R-CNN recebe
+imagens em [0,1], pois a normalização já ocorre dentro do Torchvision. O mAP comum
+usa **pycocotools/COCO**, não o cálculo simplificado da versão anterior.
 
-- training logs
-- checkpoints
-- per-epoch history
-- training curves
-- qualitative prediction galleries
-- aggregate metrics in CSV format
+## Artefatos para o artigo
 
-## Evaluation Metrics
+Tudo fica em `results/<experiment.name>/`:
 
-The shared evaluation pipeline reports detection and counting metrics such as:
+```text
+fish_cv5_seed42/
+├── resolved_config.json
+├── source/                       # snapshot do código identificado por SHA256
+├── archive/<data-hora>/          # resultados e relatórios das execuções anteriores
+├── splits/
+│   ├── manifest.json
+│   ├── audit.json
+│   ├── image_folds.csv / .tex
+│   ├── class_distribution.csv / .tex
+│   └── fold_01/...fold_05/        # listas de imagens e data.yaml
+├── data/images/ e data/labels/   # imagens por symlinks e rótulos compartilhados
+├── <modelo>/
+│   ├── run.json
+│   └── fold_01/...fold_05/
+│       ├── config.json e environment.json
+│       ├── completed.json e metrics.json
+│       ├── checkpoints/weights/last.pt
+│       ├── training_logs/ e training_curves/
+│       └── evaluation/          # predições, métricas, contagens, PR e confusão
+└── reports/
+    ├── methods_and_statistics.md
+    ├── completion_status.csv / .tex
+    ├── fold_metrics.csv / .tex
+    ├── summary_statistics.csv / .tex
+    ├── manuscript_table.csv / .tex
+    ├── per_class_folds.csv / .tex
+    ├── per_class_summary.csv / .tex
+    ├── paired_comparisons.csv / .tex  # após concluir todos os modelos previstos
+    ├── paired_manuscript_table.csv / .tex # comparação compacta da métrica primária
+    ├── learning_curves.csv
+    ├── figures/                 # PNG 300 dpi, PDF e SVG
+    └── out_of_fold/<modelo>/    # análise descritiva após as cinco dobras
+```
 
-- `mAP50`
-- `mAP50_95`
-- `Precision`
-- `Recall`
-- `F1`
-- `MAE`
-- `RMSE`
-- `MAPE`
-- `Bias`
-- `Pearson_r`
-- `R2`
-- `FPS`
-- `Inference_time`
-- `Parameters`
+Os gráficos incluem distribuição de classes, suporte por dobra, boxplots com os
+pontos reais de cada dobra e linhas pareadas, AP por classe, curvas de treinamento
+com média ± desvio-padrão, curvas precisão–recall, matrizes de confusão, concordância
+de contagens/Bland–Altman e exemplos qualitativos com ground truth e predições.
+Resultados parciais são identificados como parciais e não entram nas comparações.
 
-## Notes for Version Control
+AP usa IoU 0,50:0,05:0,95, 101 pontos de recall, todos os tamanhos e no máximo 100
+detecções por imagem. O score mínimo para AP é 0,001. Precision, Recall e F1 são
+micro métricas no limiar fixo 0,25 e IoU 0,50; contagens usam o mesmo limiar.
+MAPE exclui contagens verdadeiras iguais a zero e informa o suporte válido. AP de
+classes ausentes, correlações indefinidas e R² indefinido permanecem NA.
+O export comum não suporta anotações COCO `iscrowd`: ele recusa esses dados.
 
-This repository is configured to keep source code and configuration under version control while ignoring:
+As métricas finais dos modelos usam o mesmo avaliador. Curvas nativas por época são
+apenas monitoramento: Ultralytics usa critérios nativos diferentes dos adotados na
+avaliação final. Não use suas métricas por época como resultado do benchmark comum.
+FPS inclui preprocessamento, inferência e pós-processamento, exclui leitura em disco,
+usa aquecimento e sincronização CUDA. Interprete a comparação junto com hardware e
+batch size. `Parameters` conta todos os parâmetros, inclusive os congelados, antes
+da fusão de BatchNorm na inferência. `Training_seconds` inclui monitoramento e
+exportação dos artefatos da fase de treinamento.
 
-- local datasets
-- generated results
-- model weight files
-- IDE settings
-- Python cache files
+## Estatística
 
-That keeps the repository lightweight and avoids publishing large artifacts or experiment leftovers by default.
+As unidades das tabelas comparativas são as **cinco dobras**, nunca as épocas ou
+bounding boxes. São exportados média, desvio-padrão amostral, mediana, mínimo,
+máximo e quantidade de valores válidos. Os resultados OOF agrupados são descritivos
+e ficam separados: AP agrupado não equivale à média dos APs das dobras.
+
+O padrão define `mAP50_95` como métrica primária e compara `mAP50_95`, `mAP50`, `F1`,
+`MAE` e `RMSE`. As comparações só começam quando os modelos de
+`statistics.required_models` têm todas as dobras completas. O teste t pareado usa
+a correção aproximada de Nadeau–Bengio:
+
+```text
+SE = sqrt((1/k + mean(n_avaliação/n_treinamento)) × variância amostral das diferenças)
+df = k − 1
+```
+
+As saídas incluem diferença A−B, IC aproximado de 95%, p bilateral, efeito pareado
+dz descritivo e p ajustado por Holm em toda a família de pares de modelos/métricas.
+Os ICs das diferenças não têm ajuste simultâneo; o ajuste de Holm aplica-se aos p.
+Diferenças não nulas com variância zero ficam com inferência indefinida.
+
+Com cinco dobras de um único dataset, os testes são **exploratórios**, com baixo
+poder e pressupostos difíceis de verificar. A correção considera aproximadamente
+a dependência causada pelos conjuntos de treinamento sobrepostos. Não se afirma
+superioridade científica automaticamente. Ajustar hiperparâmetros após observar
+esses resultados introduz viés de seleção; seria necessária validação aninhada ou
+dados externos para separar essa etapa de uma avaliação independente.
+
+O arquivo `methods_and_statistics.md` registra o protocolo, definições e limitações
+para auxiliar a redação da seção de métodos. Referências:
+
+- [Sechidis et al. e estratificação multirrótulo](https://github.com/trent-b/iterative-stratification)
+- [Avaliador COCO oficial](https://github.com/cocodataset/cocoapi/blob/master/PythonAPI/pycocotools/cocoeval.py)
+- [Correção estatística e dependência entre dobras](https://scikit-learn.org/stable/auto_examples/model_selection/plot_grid_search_stats.html)
+
+## Verificação e R opcional
+
+```bash
+python -m unittest discover -s tests -v
+Rscript evaluation/graficos.R results/fish_cv5_seed42/reports/fold_metrics.csv
+```
+
+O script R usa métricas finais por dobra; não transforma épocas correlacionadas em
+amostras estatísticas. Requer ggplot2, dplyr e tidyr. Python já gera os relatórios
+completos, sem depender de R.
+
+Datasets, pesos e resultados são ignorados pelo Git. Os módulos Python dentro de
+`datasets/` são versionáveis para preservar o código de preparação e carregamento.

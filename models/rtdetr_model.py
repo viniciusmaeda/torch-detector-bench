@@ -9,11 +9,10 @@ import torch
 from PIL import Image
 from ultralytics import RTDETR
 
-from datasets.dataset_loader import build_yolo_data_config
 from models.common import PredictionResult
+from models.ultralytics_training import fit_ultralytics
 from utils.config import get_training_value
 from utils.optimizer_factory import get_optimizer_hyperparameters
-from utils.paths import CHECKPOINTS_DIRNAME, get_model_results_dir
 
 SUPPORTED_RTDETR_MODELS: Final[tuple[str, ...]] = (
     "rtdetr-l.pt",
@@ -78,38 +77,7 @@ class RTDETRDetector:
         logger,
     ) -> Optional[Path]:
         """Train RT-DETR using the Ultralytics training loop."""
-        yolo_data_path = build_yolo_data_config(
-            config=config,
-            project_root=self.project_root,
-            model_name=self.config_key,
-        )
-        model_results_dir = get_model_results_dir(
-            project_root=self.project_root,
-            config=config,
-            model_name=self.config_key,
-        )
-        results = self.model.train(
-            data=str(yolo_data_path),
-            model=self.model_name,
-            epochs=int(get_training_value(config, self.config_key, "epochs")),
-            imgsz=int(get_training_value(config, self.config_key, "image_size")),
-            batch=int(get_training_value(config, self.config_key, "batch_size")),
-            lr0=float(get_training_value(config, self.config_key, "learning_rate")),
-            project=str(model_results_dir),
-            name=CHECKPOINTS_DIRNAME,
-            device=self._device_argument(),
-            optimizer=self.optimizer_name,
-            pretrained=True,
-            exist_ok=True,
-        )
-        best_weights = Path(results.save_dir) / "weights" / "best.pt"
-        if best_weights.exists():
-            self.best_checkpoint_path = best_weights
-            self.model = RTDETR(str(best_weights))
-        logger.info("RT-DETR base model: %s", self.model_name)
-        logger.info("RT-DETR optimizer: %s", self.optimizer_name)
-        logger.info("RT-DETR best checkpoint: %s", self.best_checkpoint_path)
-        return self.best_checkpoint_path
+        return fit_ultralytics(self, config, device, logger, RTDETR)
 
     def predict_batch(
         self,
@@ -121,7 +89,9 @@ class RTDETRDetector:
         results = self.model.predict(
             source=images,
             conf=score_threshold,
-            device=self._device_argument(),
+            imgsz=int(get_training_value(self.config, self.config_key, "image_size")),
+            max_det=int(self.config["evaluation"]["max_detections"]),
+            device=(device.index or 0) if device.type == "cuda" else str(device),
             verbose=False,
         )
         predictions: List[PredictionResult] = []
@@ -147,4 +117,6 @@ class RTDETRDetector:
 
     def num_parameters(self) -> int:
         """Count trainable parameters of the PyTorch RT-DETR model."""
-        return sum(parameter.numel() for parameter in self.model.model.parameters() if parameter.requires_grad)
+        if hasattr(self, "parameter_count"):
+            return self.parameter_count
+        return sum(parameter.numel() for parameter in self.model.model.parameters())

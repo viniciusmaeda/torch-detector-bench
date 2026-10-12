@@ -57,7 +57,12 @@ class FasterRCNNDetector:
         self.config = config
         self.model_name = self._resolve_model_name(config)
         self.name = f"Faster R-CNN ({self.model_name})"
-        self.model = FASTER_R_CNN_MODEL_FACTORIES[self.model_name](weights="DEFAULT")
+        image_size = int(get_training_value(config, self.config_key, "image_size"))
+        self.model = FASTER_R_CNN_MODEL_FACTORIES[self.model_name](
+            weights="DEFAULT", min_size=image_size, max_size=image_size,
+            box_score_thresh=float(config["evaluation"].get("ap_score_threshold", 0.001)),
+            box_detections_per_img=int(config["evaluation"]["max_detections"]),
+        )
         in_features = self.model.roi_heads.box_predictor.cls_score.in_features
         self.model.roi_heads.box_predictor = FastRCNNPredictor(in_features, num_classes)
         self.model.to(device)
@@ -121,11 +126,7 @@ class FasterRCNNDetector:
             orig_w, orig_h = image.size
             resized_image = F.resize(image, [image_size, image_size])
             image_tensor = F.to_tensor(resized_image)
-            image_tensor = F.normalize(
-                image_tensor,
-                mean=[0.485, 0.456, 0.406],
-                std=[0.229, 0.224, 0.225],
-            )
+            # Torchvision's GeneralizedRCNNTransform already normalizes tensors.
 
             boxes = target["boxes_xywh"].clone()
             if boxes.numel() > 0:
@@ -204,4 +205,4 @@ class FasterRCNNDetector:
 
     def num_parameters(self) -> int:
         """Count trainable parameters."""
-        return sum(parameter.numel() for parameter in self.model.parameters() if parameter.requires_grad)
+        return sum(parameter.numel() for parameter in self.model.parameters())

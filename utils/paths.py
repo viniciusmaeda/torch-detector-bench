@@ -16,7 +16,13 @@ CHECKPOINTS_DIRNAME = "checkpoints"
 
 def get_results_root(project_root: Path, config: Dict[str, Any]) -> Path:
     """Return the root directory that stores experiment outputs."""
-    return project_root / str(config["experiment"]["output_dir"])
+    root = project_root / str(config["experiment"]["output_dir"])
+    if config.get("cross_validation", {}).get("enabled", False):
+        name = str(config["experiment"]["name"])
+        if not name or Path(name).name != name or name in {".", ".."}:
+            raise ValueError("experiment.name must be a single directory name.")
+        root = root / name
+    return root
 
 
 def format_yolo_results_dir(model_name: str) -> str:
@@ -45,7 +51,7 @@ def format_fasterrcnn_results_dir(model_name: str) -> str:
     return MODEL_RESULTS_DIRS["fasterrcnn"]
 
 
-def get_model_results_dir(project_root: Path, config: Dict[str, Any], model_name: str) -> Path:
+def get_model_base_dir(project_root: Path, config: Dict[str, Any], model_name: str) -> Path:
     """Return the model-specific directory inside results/."""
     model_key = get_model_key(model_name)
     results_root = get_results_root(project_root=project_root, config=config)
@@ -61,6 +67,14 @@ def get_model_results_dir(project_root: Path, config: Dict[str, Any], model_name
         )
         return results_root / format_fasterrcnn_results_dir(fasterrcnn_model_name)
     return results_root / MODEL_RESULTS_DIRS[model_key]
+
+
+def get_model_results_dir(project_root: Path, config: Dict[str, Any], model_name: str) -> Path:
+    """Separate every fold's artifacts inside its model directory."""
+    root = get_model_base_dir(project_root, config, model_name)
+    if "_cv" in config:
+        root = root / f"fold_{config['_cv']['fold']:02d}"
+    return root
 
 
 def get_model_checkpoints_dir(project_root: Path, config: Dict[str, Any], model_name: str) -> Path:

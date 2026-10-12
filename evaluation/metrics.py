@@ -222,18 +222,18 @@ def compute_count_metrics(
 
     mae = float(np.mean(np.abs(diff)))
     rmse = float(np.sqrt(np.mean(diff ** 2)))
-    denominator = np.where(gt_counts == 0, 1.0, gt_counts)
-    mape = float(np.mean(np.abs(diff) / denominator) * 100.0)
+    positive = gt_counts > 0
+    mape = float(np.mean(np.abs(diff[positive]) / gt_counts[positive]) * 100.0) if positive.any() else float("nan")
     bias = float(np.mean(diff))
 
     if pred_counts.size > 1 and np.std(pred_counts) > 0 and np.std(gt_counts) > 0:
         pearson_r = float(np.corrcoef(pred_counts, gt_counts)[0, 1])
     else:
-        pearson_r = 0.0
+        pearson_r = float("nan")
 
     ss_res = float(np.sum((gt_counts - pred_counts) ** 2))
     ss_tot = float(np.sum((gt_counts - np.mean(gt_counts)) ** 2))
-    r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
+    r2 = 1.0 - (ss_res / ss_tot) if ss_tot > 0 else float("nan")
 
     return {
         "MAE": mae,
@@ -242,6 +242,7 @@ def compute_count_metrics(
         "Bias": bias,
         "Pearson_r": pearson_r,
         "R2": float(r2),
+        "MAPE_valid_images": int(positive.sum()),
     }
 
 

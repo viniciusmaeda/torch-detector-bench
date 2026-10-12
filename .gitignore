@@ -29,7 +29,8 @@ logs/
 *.csv
 
 # Datasets and generated labels
-datasets/
+datasets/*
+!datasets/*.py
 
 # Model weights and checkpoints
 *.pt

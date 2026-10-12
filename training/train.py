@@ -46,7 +46,7 @@ def _run_torch_epoch(
     epoch: int = 0,
     total_epochs: int = 0,
     log_interval: int = 10,
-) -> float:
+) -> dict:
     """Run one epoch for torchvision and DETR models."""
     model.model.train()
     total_loss = 0.0
@@ -75,6 +75,8 @@ def _run_torch_epoch(
             raise ValueError(f"Unsupported torch training loop for {model.name}")
 
         if not torch.isfinite(loss):
+            if "_cv" in model.config:
+                raise FloatingPointError("Non-finite training loss; fold is not publishable.")
             skipped_batches += 1
             if logger is not None:
                 logger.warning(
@@ -91,6 +93,8 @@ def _run_torch_epoch(
         loss.backward()
         grad_norm = torch.nn.utils.clip_grad_norm_(model.model.parameters(), max_norm=grad_clip_norm)
         if not torch.isfinite(grad_norm):
+            if "_cv" in model.config:
+                raise FloatingPointError("Non-finite gradient norm; fold is not publishable.")
             skipped_batches += 1
             optimizer.zero_grad(set_to_none=True)
             if logger is not None:
@@ -153,11 +157,16 @@ def _validate_torch_epoch(
     epoch: int = 0,
     total_epochs: int = 0,
     log_interval: int = 10,
-) -> float:
+) -> dict:
     """Compute validation loss."""
+    previous_modes = {module: module.training for module in model.model.modules()}
     if model.config_key == "fasterrcnn":
         # Torchvision detection models return losses only in train mode.
         model.model.train()
+        # Validation losses must not update running statistics with held-out data.
+        for module in model.model.modules():
+            if isinstance(module, torch.nn.modules.batchnorm._BatchNorm):
+                module.eval()
     else:
         model.model.eval()
     total_loss = 0.0
@@ -183,6 +192,8 @@ def _validate_torch_epoch(
                 raise ValueError(f"Unsupported torch validation loop for {model.name}")
 
             batch_loss = float(loss.item())
+            if not torch.isfinite(loss):
+                raise FloatingPointError("Non-finite validation loss.")
             total_loss += batch_loss
             for key, value in _extract_loss_components(loss_output).items():
                 component_totals[key] = component_totals.get(key, 0.0) + value
@@ -205,7 +216,8 @@ def _validate_torch_epoch(
                     running_loss,
                 )
 
-    model.model.train()
+    for module, mode in previous_modes.items():
+        module.training = mode
     processed_batches = max(len(dataloader), 1)
     return {
         "loss": total_loss / processed_batches,
@@ -274,6 +286,9 @@ def train_model(
     best_val_loss = float("inf")
     history: list[dict[str, float]] = []
     epochs = int(get_training_value(config, model.config_key, "epochs"))
+    if epochs <= 0:
+        raise ValueError("epochs must be positive.")
+    cross_validation = "_cv" in config
     log_interval = int(get_training_value(config, model.config_key, "log_interval", 10))
     scheduler = model.build_scheduler(optimizer) if optimizer is not None else None
     for epoch in range(epochs):
@@ -331,7 +346,7 @@ def train_model(
         history.append(epoch_history)
 
         _save_checkpoint(model, last_checkpoint_path, optimizer, epoch, val_loss)
-        if val_loss < best_val_loss:
+        if not cross_validation and val_loss < best_val_loss:
             best_val_loss = val_loss
             _save_checkpoint(model, best_checkpoint_path, optimizer, epoch, val_loss)
             if logger is not None:
@@ -402,8 +417,10 @@ def train_model(
         logger.info("Saved training history to %s", history_csv_path)
         logger.info("Saved training plot to %s", history_plot_path)
 
-    checkpoint = torch.load(best_checkpoint_path, map_location=device)
+    evaluation_checkpoint = last_checkpoint_path if cross_validation else best_checkpoint_path
+    checkpoint = torch.load(evaluation_checkpoint, map_location=device, weights_only=True)
     model.model.load_state_dict(checkpoint["model_state_dict"])
+    model.evaluation_checkpoint_path = evaluation_checkpoint
     qualitative_path = history_dir / f"{model.config_key}_qualitative_predictions.png"
     save_prediction_gallery(
         model=model,
@@ -416,4 +433,4 @@ def train_model(
     )
     if logger is not None:
         logger.info("Saved qualitative predictions to %s", qualitative_path)
-    return best_checkpoint_path
+    return evaluation_checkpoint

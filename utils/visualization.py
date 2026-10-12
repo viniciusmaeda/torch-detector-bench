@@ -8,6 +8,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 from matplotlib.patches import Rectangle
+from utils.artifacts import save_figure
 
 
 def print_summary_table(results_df: pd.DataFrame) -> None:
@@ -80,8 +81,7 @@ def plot_training_history(history_df: pd.DataFrame, output_path: Path, title: st
 
     figure.suptitle(title)
     figure.tight_layout()
-    figure.savefig(output_path, dpi=200, bbox_inches="tight")
-    plt.close(figure)
+    save_figure(figure, output_path)
 
 
 def save_prediction_gallery(
@@ -101,7 +101,7 @@ def save_prediction_gallery(
     if batch is None:
         return
 
-    images, _targets = batch
+    images, targets = batch
     images = images[:max_images]
     predictions = model.predict_batch(
         images=images,
@@ -113,9 +113,13 @@ def save_prediction_gallery(
     if len(images) == 1:
         axes = [axes]
 
-    for axis, image, prediction in zip(axes, images, predictions):
+    for axis, image, prediction, target in zip(axes, images, predictions, targets):
         axis.imshow(image)
         axis.axis("off")
+        for box, label in zip(target["boxes_xywh"], target["labels"]):
+            x, y, w, h = [float(v) for v in box.tolist()]
+            axis.add_patch(Rectangle((x, y), w, h, fill=False, edgecolor="deepskyblue", linewidth=1.5, linestyle="--"))
+        axis.set_title(f"Image {int(target['image_id'].item())}\nBlue: ground truth; green: prediction", fontsize=9)
         for box, score, label in zip(prediction.boxes, prediction.scores, prediction.labels):
             x0, y0, x1, y1 = [float(value) for value in box.tolist()]
             width = max(x1 - x0, 1.0)
@@ -143,5 +147,4 @@ def save_prediction_gallery(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     figure.tight_layout()
-    figure.savefig(output_path, dpi=200, bbox_inches="tight")
-    plt.close(figure)
+    save_figure(figure, output_path)
